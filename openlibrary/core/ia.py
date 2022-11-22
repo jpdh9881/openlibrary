@@ -20,13 +20,11 @@ IA_BASE_URL = config.get('ia_base_url', 'https://archive.org')
 VALID_READY_REPUB_STATES = ['4', '19', '20', '22']
 
 
-def get_api_response(url, params=None):
+def get_api_response(url: str, params: dict | None = None) -> dict:
     """
     Makes an API GET request to archive.org, collects stats
     Returns a JSON dict.
-    :param str url:
     :param dict params: url parameters
-    :rtype: dict
     """
     api_response = {}
     stats.begin('archive.org', url=url)
@@ -42,17 +40,17 @@ def get_api_response(url, params=None):
     return api_response
 
 
-def get_metadata_direct(itemid, only_metadata=True, cache=True):
+def get_metadata_direct(
+    itemid: str, only_metadata: bool = True, cache: bool = True
+) -> dict:
     """
     Fetches metadata by querying the archive.org metadata API, without local caching.
-    :param str itemid:
     :param bool cache: if false, requests uncached metadata from archive.org
     :param bool only_metadata: whether to get the metadata without any processing
-    :rtype: dict
     """
     url = f'{IA_BASE_URL}/metadata/{web.safestr(itemid.strip())}'
     params = {}
-    if cache:
+    if cache is False:
         params['dontcache'] = 1
     full_json = get_api_response(url, params)
     return extract_item_metadata(full_json) if only_metadata else full_json

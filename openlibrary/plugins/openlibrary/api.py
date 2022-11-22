@@ -70,9 +70,11 @@ class trending_books_api(delegate.page):
         from openlibrary.views.loanstats import SINCE_DAYS
 
         period = period[1:]  # remove slash
-        i = web.input(page=1, limit=100)
+        i = web.input(page=1, limit=100, days=0, hours=0)
+        days = SINCE_DAYS.get(period, int(i.days))
         works = get_trending_books(
-            since_days=SINCE_DAYS[period],
+            since_days=days,
+            since_hours=int(i.hours),
             limit=int(i.limit),
             page=int(i.page),
             books_only=True,
@@ -80,6 +82,8 @@ class trending_books_api(delegate.page):
         result = {
             'query': f"/trending/{period}",
             'works': [dict(work) for work in works],
+            'days': days,
+            'hours': i.hours,
         }
         return delegate.RawText(json.dumps(result), content_type="application/json")
 
@@ -89,9 +93,7 @@ class browse(delegate.page):
     encoding = "json"
 
     def GET(self):
-        i = web.input(
-            q='', page=1, limit=100, subject='', work_id='', _type='', sorts=''
-        )
+        i = web.input(q='', page=1, limit=100, subject='', sorts='')
         sorts = i.sorts.split(',')
         page = int(i.page)
         limit = int(i.limit)
@@ -100,8 +102,6 @@ class browse(delegate.page):
             limit=limit,
             page=page,
             subject=i.subject,
-            work_id=i.work_id,
-            _type=i._type,
             sorts=sorts,
         )
         works = lending.get_available(url=url) if url else []

@@ -2,7 +2,7 @@ import logging
 import web
 from dataclasses import dataclass
 from datetime import date, datetime
-from typing import Literal, Optional, cast, Any, Final
+from typing import Literal, cast, Any, Final
 from collections.abc import Iterable
 from openlibrary.plugins.worksearch.search import get_solr
 
@@ -44,7 +44,9 @@ class Bookshelves(db.CommonExtras):
         }
 
     @classmethod
-    def total_books_logged(cls, shelf_ids: list[str] = None, since: date = None) -> int:
+    def total_books_logged(
+        cls, shelf_ids: list[str] | None = None, since: date | None = None
+    ) -> int:
         """Returns (int) number of books logged across all Reading Log shelves (e.g. those
         specified in PRESET_BOOKSHELVES). One may alternatively specify a
         `list` of `shelf_ids` to isolate or span multiple
@@ -72,7 +74,7 @@ class Bookshelves(db.CommonExtras):
         return results[0]
 
     @classmethod
-    def total_unique_users(cls, since: date = None) -> int:
+    def total_unique_users(cls, since: date | None = None) -> int:
         """Returns the total number of unique users who have logged a
         book. `since` may be provided to only return the number of users after
         a certain datetime.date.
@@ -86,7 +88,12 @@ class Bookshelves(db.CommonExtras):
 
     @classmethod
     def most_logged_books(
-        cls, shelf_id='', limit=10, since: date = None, page=1, fetch=False
+        cls,
+        shelf_id: str = '',
+        limit: int = 10,
+        since: date | None = None,
+        page: int = 1,
+        fetch: bool = False,
     ) -> list:
         """Returns a ranked list of work OLIDs (in the form of an integer --
         i.e. OL123W would be 123) which have been most logged by
@@ -136,7 +143,7 @@ class Bookshelves(db.CommonExtras):
 
     @classmethod
     def count_total_books_logged_by_user(
-        cls, username: str, bookshelf_ids: list[str] = None
+        cls, username: str, bookshelf_ids: list[str] | None = None
     ) -> int:
         """Counts the (int) total number of books logged by this `username`,
         with the option of limiting the count to specific bookshelves
@@ -150,7 +157,7 @@ class Bookshelves(db.CommonExtras):
 
     @classmethod
     def count_total_books_logged_by_user_per_shelf(
-        cls, username: str, bookshelf_ids: list[str] = None
+        cls, username: str, bookshelf_ids: list[str] | None = None
     ) -> dict[int, int]:
         """Returns a dict mapping the specified user's bookshelves_ids to the
         number of number of books logged per each shelf, i.e. {bookshelf_id:
@@ -435,10 +442,10 @@ class Bookshelves(db.CommonExtras):
     @classmethod
     def get_recently_logged_books(
         cls,
-        bookshelf_id=None,
-        limit=50,
-        page=1,
-        fetch=False,
+        bookshelf_id: str | None = None,
+        limit: int = 50,
+        page: int = 1,
+        fetch: bool = False,
     ) -> list:
         oldb = db.get_db()
         page = int(page or 1)
@@ -456,9 +463,7 @@ class Bookshelves(db.CommonExtras):
         return cls.fetch(logged_books) if fetch else logged_books
 
     @classmethod
-    def get_users_read_status_of_work(
-        cls, username: str, work_id: str
-    ) -> Optional[str]:
+    def get_users_read_status_of_work(cls, username: str, work_id: str) -> str | None:
         """A user can mark a book as (1) want to read, (2) currently reading,
         or (3) already read. Each of these states is mutually
         exclusive. Returns the user's read state of this work, if one
@@ -523,7 +528,7 @@ class Bookshelves(db.CommonExtras):
             )
 
     @classmethod
-    def remove(cls, username: str, work_id: str, bookshelf_id: str = None):
+    def remove(cls, username: str, work_id: str, bookshelf_id: str | None = None):
         oldb = db.get_db()
         where = {'username': username, 'work_id': int(work_id)}
         if bookshelf_id:

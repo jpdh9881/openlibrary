@@ -1,6 +1,6 @@
 """Module for providing core functionality of lending on Open Library.
 """
-from typing import Literal, Optional
+from typing import Literal
 
 import web
 import datetime
@@ -84,41 +84,16 @@ def setup(config):
     config_http_request_timeout = config.get('http_request_timeout')
 
 
-def get_work_authors_and_related_subjects(work_id):
-    if 'env' not in web.ctx:
-        delegate.fakeload()
-    work = web.ctx.site.get(work_id)
-    return {
-        'authors': work.get_author_names(blacklist=['anonymous']) if work else [],
-        'subjects': work.get_related_books_subjects() if work else [],
-    }
-
-
-@public
-def cached_work_authors_and_subjects(work_id):
-    try:
-        return cache.memcache_memoize(
-            get_work_authors_and_related_subjects,
-            'works_authors_and_subjects',
-            timeout=dateutil.HALF_DAY_SECS,
-        )(work_id)
-    except AttributeError:
-        logger.exception("cached_work_authors_and_subjects(%s)" % work_id)
-        return {'authors': [], 'subject': []}
-
-
 @public
 def compose_ia_url(
-    limit: int = None,
+    limit: int | None = None,
     page: int = 1,
     subject=None,
     query=None,
-    work_id=None,
-    _type: Literal['authors', 'subjects'] = None,
     sorts=None,
-    advanced=True,
-    rate_limit_exempt=True,
-) -> Optional[str]:
+    advanced: bool = True,
+    rate_limit_exempt: bool = True,
+) -> str | None:
     """This needs to be exposed by a generalized API endpoint within
     plugins/api/browse which lets lazy-load more items for
     the homepage carousel and support the upcoming /browse view
@@ -156,27 +131,6 @@ def compose_ia_url(
     if subject:
         q += " AND openlibrary_subject:" + subject
 
-    if work_id and _type in ("authors", "subjects"):
-        _q = None
-        works_authors_and_subjects = cached_work_authors_and_subjects(work_id)
-        if _type == "authors":
-            authors = works_authors_and_subjects.get('authors', [])
-            if not authors:
-                return None
-            name_variations = [
-                variation
-                for name in authors
-                for variation in (name, ','.join(name.split(' ', 1)[::-1]))
-            ]
-
-            _q = ' OR '.join(f'creator:"{name}"' for name in name_variations)
-        elif _type == "subjects":
-            subjects = works_authors_and_subjects.get('subjects', [])
-            if not subjects:
-                return None
-            _q = ' OR '.join(f'subject:"{subject}"' for subject in subjects)
-        q += ' AND ({}) AND !openlibrary_work:({})'.format(_q, work_id.split('/')[-1])
-
     if not advanced:
         _sort = sorts[0] if sorts else ''
         if ' desc' in _sort:
@@ -206,24 +160,6 @@ def compose_ia_url(
         params.append(('sort[]', sort))
     base_url = "http://%s/advancedsearch.php" % config_bookreader_host
     return base_url + '?' + urlencode(params)
-
-
-def get_random_available_ia_edition() -> str:
-    """uses archive advancedsearch to raise a random book"""
-    try:
-        url = (
-            "http://%s/advancedsearch.php?q=_exists_:openlibrary_work"
-            "+AND+(lending___available_to_borrow:true"
-            " OR lending___available_to_browse:true)"
-            "&fl=identifier,openlibrary_edition"
-            "&output=json&rows=25&sort[]=random" % (config_bookreader_host)
-        )  # internetarchive/openlibrary#6592: Request 25 editions and randomly choose
-        response = requests.get(url, timeout=config_http_request_timeout)
-        items = response.json().get('response', {}).get('docs', [])
-        return random.choice(items)["openlibrary_edition"]
-    except Exception:  # TODO: Narrow exception scope
-        logger.exception(f"get_random_available_ia_edition({url})")
-        return ''
 
 
 @public
@@ -270,8 +206,6 @@ def get_available(
     page=1,
     subject=None,
     query=None,
-    work_id=None,
-    _type=None,
     sorts=None,
     url=None,
 ):
@@ -289,8 +223,6 @@ def get_available(
         page=page,
         subject=subject,
         query=query,
-        work_id=work_id,
-        _type=_type,
         sorts=sorts,
     )
     if not url:
@@ -301,8 +233,6 @@ def get_available(
                 'page': page,
                 'subject': subject,
                 'query': query,
-                'work_id': work_id,
-                'type': _type,
                 'sorts': sorts,
             },
         )
@@ -333,11 +263,10 @@ def get_available(
         return {'error': 'request_timeout'}
 
 
-def get_availability(key, ids):
+def get_availability(key: str, ids: list[str]) -> dict:
     """
     :param str key: the type of identifier
     :param list of str ids:
-    :rtype: dict
     """
     ids = [id_ for id_ in ids if id_]  # remove infogami.infobase.client.Nothing
     if not ids:
@@ -464,11 +393,9 @@ def get_availability_of_ocaid(ocaid):
     return get_availability('identifier', [ocaid])
 
 
-def get_availability_of_ocaids(ocaids):
+def get_availability_of_ocaids(ocaids: list[str]) -> dict:
     """
     Retrieves availability based on ocaids/archive.org identifiers
-    :param list[str] ocaids:
-    :rtype: dict
     """
     return get_availability('identifier', ocaids)
 
@@ -721,11 +648,9 @@ class Loan(dict):
                 'ocaid': identifier,
                 'expiry': expiry,
                 'uuid': _uuid,
-                'resource_type': 'bookreader',  # noqa: F601
-                'resource_id': 'bookreader:%s' % identifier,  # noqa: F601
                 'loaned_at': loaned_at,
-                'resource_type': resource_type,  # noqa: F601
-                'resource_id': resource_id,  # noqa: F601
+                'resource_type': resource_type,
+                'resource_id': resource_id,
                 'loan_link': loan_link,
             }
         )
